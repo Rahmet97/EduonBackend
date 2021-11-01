@@ -243,12 +243,8 @@ CORS_PREFLIGHT_MAX_AGE = 86400
 #    "http://142.93.60.60/"
 # )
 STATIC_URL = '/static/'
-<<<<<<< HEAD
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-=======
-# STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
->>>>>>> added static files and changed settings
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+# STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
