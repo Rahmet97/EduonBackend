@@ -644,6 +644,7 @@ def get_speaker(request):
             try:
                 query = Speaker.objects.get(pk=id)
                 ser = SpeakerGetSerializer(query)
+                print(query.id)
             except:
                 data = {
                     "success": False,
@@ -1235,8 +1236,6 @@ def get_speaker_courses(request):
         courses = paginator.paginate_queryset(course_objects, request)
         sr = GetCourseSerializer(courses, many=True)
         data = sr.data
-        data["users_count"] = Order.objects.filter(course__author_id=id).count()
-        data["courses_count"] = course_objects.count()
     except Exception as e:
         data = {
             "success": False,

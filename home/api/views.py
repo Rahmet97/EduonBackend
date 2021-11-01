@@ -449,7 +449,7 @@ class HomeSpeakerAPIView(APIView):
 class GetCourseListAPIView(ListAPIView):
     queryset = Course.objects.all()
     serializer_class = GetCourseSerializer
-    pagination_class = CourseCustomPagination
+    # pagination_class = CourseCustomPagination
     filter_backends = [SearchFilter]
     search_fields = ['name']
     authentication_classes = []
@@ -489,16 +489,16 @@ class GetCourseListAPIView(ListAPIView):
 
         queryset = self.filter_queryset(qs.distinct())
 
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        # page = self.paginate_queryset(queryset)
+        # if page is not None:
+        #     serializer = self.get_serializer(page, many=True)
+        #     return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
         data = {
             "success": True,
             'message': message,
-            "error": serializer.errors,
+            # "error": serializer.errors,
             "data": serializer.data
         }
         return Response(data)

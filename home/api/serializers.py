@@ -7,6 +7,7 @@ from home.models import *
 class SpeakerGetSerializer(ModelSerializer):
     full_name = SerializerMethodField()
     speaker_rank = SerializerMethodField()
+    course_users_count = SerializerMethodField()
 
     def get_speaker_rank(self, obj):
         cr = RankCourse.objects.filter(course__author=obj.id)
@@ -34,6 +35,21 @@ class SpeakerGetSerializer(ModelSerializer):
             full_name = ""
         return full_name
 
+    def get_course_users_count(self, obj):
+        try:
+            usr = Order.objects.filter(course__author_id=obj.id).count()
+            courses = Course.objects.filter(author_id=obj.id).count()
+            data = {
+                'course_count': usr,
+                'users_count': courses
+            }
+        except:
+            data = {
+                'course_count': 0,
+                'users_count': 0
+            }
+        return data
+
     class Meta:
         model = Speaker
         fields = [
@@ -45,7 +61,8 @@ class SpeakerGetSerializer(ModelSerializer):
             "is_top",
             "logo",
             "image",
-            "speaker_rank"
+            "speaker_rank",
+            "course_users_count"
         ]
 
 
