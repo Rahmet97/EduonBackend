@@ -16,6 +16,7 @@ from home.models import (
 )
 from home.sms import sms_send
 from home.serializers import CourseSerializer, DjangoCourseSerializer
+from rest_framework_simplejwt.backends import TokenBackend
 from simplejwt.tokens import RefreshToken
 from .serializers import (
     UsersSerializer, CountrySerializer, RegionSerialzier, GetCourseSerializer, SpeakerGetSerializer, CategorySerializer,
@@ -752,41 +753,50 @@ def get_rayting(request):
 def set_rayting(request):
     try:
         course = request.POST.get('course_id')
-        user = request.user.id
-        value = request.POST.get('value')
-        turi = request.POST.get('turi')
-        rnk = RankCourse.objects.filter(user_id=user, course_id=course)
+        token = request.META.get('HTTP_AUTHORIZATION', False)
+        if token:
+            access_token = token.split(' ')[-1]
+            get_token = TokenBackend(algorithm='HS256').decode(access_token, verify=False)
+            user = get_token.get('user_id')
+            value = request.POST.get('value')
+            turi = request.POST.get('turi')
+            rnk = RankCourse.objects.filter(user_id=user, course_id=course)
 
-        if rnk.count() > 0:
-            rn = rnk.last()
-            if turi == "1":
-                rn.course_value = value
-            elif turi == "2":
-                rn.speaker_value = value
+            if rnk.count() > 0:
+                rn = rnk.last()
+                if turi == "1":
+                    rn.course_value = value
+                elif turi == "2":
+                    rn.speaker_value = value
+                else:
+                    rn.tashkil_value = value
+                rn.save()
             else:
-                rn.tashkil_value = value
-            rn.save()
+                if turi == "1":
+                    rn = RankCourse.objects.create(
+                        user_id=user, course_id=course, course_value=value
+                    )
+                elif turi == "2":
+                    rn = RankCourse.objects.create(
+                        user_id=user, course_id=course, speaker_value=value
+                    )
+                else:
+                    rn = RankCourse.objects.create(
+                        user_id=user, course_id=course, tashkil_value=value
+                    )
+            cr = RankCourse.objects.filter(course_id=course)
+
+            data = {
+                "success": True,
+                "error": "",
+                "message": "rayting qo'yildi!",
+                "data": rayting(cr, rn)
+            }
         else:
-            if turi == "1":
-                rn = RankCourse.objects.create(
-                    user_id=user, course_id=course, course_value=value
-                )
-            elif turi == "2":
-                rn = RankCourse.objects.create(
-                    user_id=user, course_id=course, speaker_value=value
-                )
-            else:
-                rn = RankCourse.objects.create(
-                    user_id=user, course_id=course, tashkil_value=value
-                )
-        cr = RankCourse.objects.filter(course_id=course)
-
-        data = {
-            "success": True,
-            "error": "",
-            "message": "rayting qo'yildi!",
-            "data": rayting(cr, rn)
-        }
+            data = {
+                "success": False,
+                "error": "Token yuborilmadi!"
+            }
     except Exception as er:
         data = {
             "success": False,

@@ -40,8 +40,8 @@ class SpeakerGetSerializer(ModelSerializer):
             usr = Order.objects.filter(course__author_id=obj.id).count()
             courses = Course.objects.filter(author_id=obj.id).count()
             data = {
-                'course_count': usr,
-                'users_count': courses
+                'course_count': courses,
+                'users_count': usr
             }
         except:
             data = {
