@@ -18,6 +18,6 @@ urlpatterns = [
     path('payment-to-course-from-balance/', csrf_exempt(payment_to_course_from_balance)),
     path('send-sms/', csrf_exempt(send_sms_to_user)),
     path('check-sms-and-payment/', csrf_exempt(check_sms_and_payment)),
-    path('get-payment-history/', csrf_exempt(GetPaymentListClass.as_view())),
+    path('get-payment-history/', csrf_exempt(get_payment_history)),
     path('get-courses-order-list/', csrf_exempt(GetCourseOrdersList.as_view())),
 ]
