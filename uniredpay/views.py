@@ -12,7 +12,7 @@ from rest_framework.response import Response
 
 from home.models import Users, Course, Order, Speaker
 from simplejwt.backends import TokenBackend
-from uniredpay import models
+from uniredpay import models, serializers
 from uniredpay.models import PayForBalance, PercentageOfSpeaker, UserSms
 from uniredpay.serializers import PayForBalanceSerializers, CourseOrderSerializers
 from uniredpay.unired_sms import sms_send
@@ -591,11 +591,30 @@ def get_request_result(url, access_token, data, method):
     return rq.json()
 
 
-class GetPaymentListClass(ListAPIView):
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAdminUser]
-    queryset = models.PayForBalance.objects.all()
-    serializer_class = PayForBalanceSerializers
+# class GetPaymentListClass(ListAPIView):
+#     authentication_classes = [BasicAuthentication]
+#     permission_classes = [IsAuthenticated]
+#     queryset = models.PayForBalance.objects.all()
+#     serializer_class = PayForBalanceSerializers
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([])
+def get_payment_history(request):
+    try:
+        token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
+        valid_data = TokenBackend(algorithm='HS256').decode(token, verify=False)
+        user = Users.objects.get(id=valid_data['user_id'])
+    except:
+        return Response({
+            'status': False,
+            'error_type': "validation error",
+        })
+
+    data = models.PayForBalance.objects.filter(user=user)
+    serial_data = serializers.PayForBalanceSerializers(data, many=True)
+
+    return Response(serial_data.data)
 
 
 class GetCourseOrdersList(ListAPIView):
