@@ -664,3 +664,24 @@ def filter_by_cost(request):
         }
         return JsonResponse(data, status=405)
     return Response(data)
+
+
+@api_view(['get'])
+@authentication_classes([])
+@permission_classes([])
+def filter_by_language(request):
+    try:
+        language = request.GET.get("language")
+        courses = Course.objects.filter(language=language)
+        sr = GetCourseSerializer(courses, many=True)
+        data = {
+            "success": True,
+            "data": sr.data
+        }
+    except Exception as e:
+        data = {
+            "success": False,
+            "error": "{}".format(e)
+        }
+        return JsonResponse(data, status=405)
+    return Response(data)
