@@ -9,7 +9,7 @@ from .api_view import (
     get_speaker_courses, verified_courses, verified_speaker_courses, get_courses, get_sell_course_statistics,
     get_user_country_statistics, get_rank_statistics
 )
-from .views import get_cash_balance, DeleteVideoAPIView
+from .views import get_cash_balance, DeleteVideoAPIView, filter_by_cost
 
 urlpatterns = [
     path('send-code/', send_code),
@@ -21,7 +21,7 @@ urlpatterns = [
     path('reset-password/', reset_password),
     path('full-registration/', full_registration),
     path('login/', login),
-    # path('get-course/', get_course),
+    path('get-course-search/', get_course),
     # path('get-top-course/', get_top_course),
     path('get-boughted-course/', get_boughted_course),
     path('buy-course/', buy_course),
@@ -46,7 +46,8 @@ urlpatterns = [
     path('verified-courses/', verified_courses),
     path('verified-speaker-courses/', verified_speaker_courses),
     path('get-courses/', get_courses),
-    path('get-cash-balance/', get_cash_balance)
+    path('get-cash-balance/', get_cash_balance),
+    path('filter-by-cost/', filter_by_cost)
 ]
 
 from .views import CourseSpeakerAPIView, UploadVideoAndDocumentAPIView, VideosAPIView, ChangeCourseAPIView, \

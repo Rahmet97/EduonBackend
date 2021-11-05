@@ -643,3 +643,24 @@ def get_cash_balance(request):
         }
         return JsonResponse(data, status=405)
     return Response(data)
+
+
+@api_view(['get'])
+@authentication_classes([])
+@permission_classes([])
+def filter_by_cost(request):
+    try:
+        cost = request.GET.get("cost")
+        courses = Course.objects.filter(price=cost)
+        sr = GetCourseSerializer(courses, many=True)
+        data = {
+            "success": True,
+            "data": sr.data
+        }
+    except Exception as e:
+        data = {
+            "success": False,
+            "error": "{}".format(e)
+        }
+        return JsonResponse(data, status=405)
+    return Response(data)
