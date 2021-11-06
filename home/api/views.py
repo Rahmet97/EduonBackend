@@ -652,7 +652,7 @@ def filter_by_cost(request):
     try:
         minimum = request.GET.get("from")
         maximum = request.GET.get("to")
-        courses = Course.objects.filter(Q(price__gt=minimum) and Q(price__lt=maximum))
+        courses = Course.objects.filter(Q(price__gt=minimum), Q(price__lt=maximum))
         sr = GetCourseSerializer(courses, many=True)
         data = {
             "success": True,
