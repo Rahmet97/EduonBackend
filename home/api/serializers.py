@@ -66,6 +66,15 @@ class SpeakerGetSerializer(ModelSerializer):
         ]
 
 
+class LanguageSerializer(ModelSerializer):
+    class Meta:
+        model = Language
+        fields = [
+            'id',
+            'name'
+        ]
+
+
 class UsersSerializer(ModelSerializer):
     class Meta:
         model = Users

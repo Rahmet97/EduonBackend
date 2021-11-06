@@ -2,7 +2,7 @@ from datetime import datetime
 
 from django.http import JsonResponse
 from moviepy.editor import VideoFileClip
-from django.db.models import Sum, Avg
+from django.db.models import Sum, Avg, Q
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.filters import SearchFilter
@@ -14,9 +14,9 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.backends import TokenBackend
 
 from home.api.pagination import CourseCustomPagination
-from home.api.serializers import GetCourseSerializer
+from home.api.serializers import GetCourseSerializer, LanguageSerializer
 from home.models import CategoryVideo, Speaker, Rank, Course, VideoCourse, Order, LikeOrDislike, VideoViews, \
-    AboutUsNote, Users
+    AboutUsNote, Users, Language
 
 
 ################################################################################################
@@ -650,8 +650,9 @@ def get_cash_balance(request):
 @permission_classes([])
 def filter_by_cost(request):
     try:
-        cost = request.GET.get("cost")
-        courses = Course.objects.filter(price=cost)
+        minimum = request.GET.get("from")
+        maximum = request.GET.get("to")
+        courses = Course.objects.filter(Q(price__gt=minimum) and Q(price__lt=maximum))
         sr = GetCourseSerializer(courses, many=True)
         data = {
             "success": True,
@@ -677,6 +678,26 @@ def filter_by_language(request):
         data = {
             "success": True,
             "data": sr.data
+        }
+    except Exception as e:
+        data = {
+            "success": False,
+            "error": "{}".format(e)
+        }
+        return JsonResponse(data, status=405)
+    return Response(data)
+
+
+@api_view(['get'])
+@authentication_classes([])
+@permission_classes([])
+def get_languages(request):
+    try:
+        lang = Language.objects.all()
+        languages = LanguageSerializer(lang, many=True)
+        data = {
+            "success": True,
+            "data": languages.data
         }
     except Exception as e:
         data = {
