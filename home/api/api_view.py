@@ -406,22 +406,25 @@ def test(request):
 @permission_classes([])
 def get_course(request):
     try:
-        category = request.GET.get('category')
+        # category = request.GET.get('category')
         search = request.GET.get('q')
         if search is None:
             search = ""
 
-        if category is None:
-            query = Course.objects.filter(name__icontains=search)
-        else:
-            query = Course.objects.filter(category_id=category, name__icontains=search)
+        # if category is None:
+        query = Course.objects.filter(name__icontains=search, is_confirmed=True)
+        query2 = Speaker.objects.filter(Q(speaker__first_name__icontains=search) or Q(speaker__last_name__icontains=search))
+        # else:
+        #     query = Course.objects.filter(category_id=category, name__icontains=search)
 
-        ser = GetCourseSerializer(query, many=True)
+        ser1 = GetCourseSerializer(query, many=True)
+        ser2 = SpeakerGetSerializer(query2, many=True)
         data = {
             "success": True,
             "error": "",
             "message": "Kurslar olindi!",
-            "data": ser.data
+            "data_courses": ser1.data,
+            "data_speakers": ser2.data
         }
 
     except Exception as er:
@@ -683,9 +686,13 @@ def rayting(cr, rn):
     if value_cr is None:
         value_cr = 0
 
-    value_tt = cr.aggregate(value=Sum('tashkil_value')).get('value')
+    value_tt = cr.aggregate(value=Sum('content_value')).get('value')
     if value_tt is None:
         value_tt = 0
+    value_vt = cr.aggregate(value=Sum('video_value')).get('value')
+    if value_vt is None:
+        value_vt = 0
+
     count_cr = cr.filter(course_value__gt=0).count()
     if count_cr > 0:
         rank_cr = round(value_cr / count_cr, 2)
@@ -696,11 +703,16 @@ def rayting(cr, rn):
         rank_sp = round(value_sp / count_sp, 2)
     else:
         rank_sp = 0
-    count_tt = cr.filter(tashkil_value__gt=0).count()
+    count_tt = cr.filter(content_value__gt=0).count()
     if count_tt > 0:
         rank_tt = round(value_tt / count_tt, 2)
     else:
         rank_tt = 0
+    count_vr = cr.filter(video_value__gt=0).count()
+    if count_vr > 0:
+        rank_vr = round(value_vt / count_vr, 2)
+    else:
+        rank_vr = 0
 
     data = {
         "course": {
@@ -711,10 +723,14 @@ def rayting(cr, rn):
             "rank": rank_sp,
             "count": count_sp
         },
-        "tashkil": {
+        "content": {
             "rank": rank_tt,
             "count": count_tt
         },
+        "video": {
+            "rank": rank_vr,
+            "count": count_vr
+        }
     }
     ser = RaytingSerializer(rn)
     data = {
@@ -729,16 +745,25 @@ def rayting(cr, rn):
 @permission_classes([])
 def get_rayting(request):
     try:
-        course_id = request.GET.get("course_id")
-        user = request.user
-        rnk = RankCourse.objects.get(user=user, course_id=course_id)
-        cr = RankCourse.objects.filter(course_id=course_id)
-        data = {
-            "success": True,
-            "error": "",
-            "message": "Rayting olindi!",
-            "data": rayting(cr, rnk)
-        }
+        token = request.META.get('HTTP_AUTHORIZATION', False)
+        if token:
+            access_token = token.split(' ')[-1]
+            get_token = TokenBackend(algorithm='HS256').decode(access_token, verify=False)
+            user = get_token.get('user_id')
+            course_id = request.GET.get("course_id")
+            rnk = RankCourse.objects.get(user_id=user, course_id=course_id)
+            cr = RankCourse.objects.filter(course_id=course_id)
+            data = {
+                "success": True,
+                "error": "",
+                "message": "Rayting olindi!",
+                "data": rayting(cr, rnk)
+            }
+        else:
+            data = {
+                "success": False,
+                "error": "Token yuborilmadi!"
+            }
     except Exception as er:
         data = {
             "success": False,
@@ -750,39 +775,33 @@ def get_rayting(request):
 
 
 @api_view(['post'])
+@authentication_classes([])
+@permission_classes([])
 def set_rayting(request):
     try:
-        course = request.POST.get('course_id')
         token = request.META.get('HTTP_AUTHORIZATION', False)
         if token:
             access_token = token.split(' ')[-1]
             get_token = TokenBackend(algorithm='HS256').decode(access_token, verify=False)
             user = get_token.get('user_id')
-            value = request.POST.get('value')
-            turi = request.POST.get('turi')
+            course = request.POST.get('course_id')
+            course_value = request.POST.get('course_value')
+            speaker_value = request.POST.get('speaker_value')
+            content_value = request.POST.get('content_value')
+            video_value = request.POST.get('video_value')
             rnk = RankCourse.objects.filter(user_id=user, course_id=course)
 
             if rnk.count() > 0:
                 rn = rnk.last()
-                if turi == "1":
-                    rn.course_value = value
-                elif turi == "2":
-                    rn.speaker_value = value
-                else:
-                    rn.tashkil_value = value
+                rn.course_value = course_value
+                rn.speaker_value = speaker_value
+                rn.content_value = content_value
+                rn.video_value = video_value
                 rn.save()
             else:
-                if turi == "1":
-                    rn = RankCourse.objects.create(
-                        user_id=user, course_id=course, course_value=value
-                    )
-                elif turi == "2":
-                    rn = RankCourse.objects.create(
-                        user_id=user, course_id=course, speaker_value=value
-                    )
-                else:
-                    rn = RankCourse.objects.create(
-                        user_id=user, course_id=course, tashkil_value=value
+                rn = RankCourse.objects.create(
+                        user_id=user, course_id=course, course_value=course_value,
+                        speaker_value=speaker_value, content_value=content_value, video_value=video_value
                     )
             cr = RankCourse.objects.filter(course_id=course)
 
