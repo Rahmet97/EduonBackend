@@ -60,7 +60,8 @@ class VideoCourseSerializer(serializers.ModelSerializer):
     author = SpeakerSerializer(read_only=True)
     speaker_rank = serializers.SerializerMethodField()
     course_rank = serializers.SerializerMethodField()
-    tashkil_rank = serializers.SerializerMethodField()
+    content_rank = serializers.SerializerMethodField()
+    video_rank = serializers.SerializerMethodField()
 
     class Meta:
         model = VideoCourse
@@ -88,10 +89,21 @@ class VideoCourseSerializer(serializers.ModelSerializer):
         else:
             return {"rank": 0, "count": 0}
 
-    def get_tashkil_rank(self, obj):
+    def get_content_rank(self, obj):
         cr = RankCourse.objects.filter(course_id=obj.course.id)
-        count = cr.filter(tashkil_value__gt=0).count()
-        value = cr.aggregate(value=Sum('tashkil_value')).get('value')
+        count = cr.filter(content_value__gt=0).count()
+        value = cr.aggregate(value=Sum('content_value')).get('value')
+        if value is None:
+            value = 0
+        if count > 0:
+            return {"rank": round(value / count, 2), "count": count}
+        else:
+            return {"rank": 0, "count": 0}
+
+    def get_video_rank(self, obj):
+        cr = RankCourse.objects.filter(course_id=obj.course.id)
+        count = cr.filter(video_value__gt=0).count()
+        value = cr.aggregate(value=Sum('video_value')).get('value')
         if value is None:
             value = 0
         if count > 0:
@@ -106,7 +118,8 @@ class VideoCourseGetSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     speaker_rank = serializers.SerializerMethodField()
     course_rank = serializers.SerializerMethodField()
-    tashkil_rank = serializers.SerializerMethodField()
+    content_rank = serializers.SerializerMethodField()
+    video_rank = serializers.SerializerMethodField()
 
     class Meta:
         model = VideoCourse
@@ -136,9 +149,19 @@ class VideoCourseGetSerializer(serializers.ModelSerializer):
         else:
             return 0
 
-    def get_tashkil_rank(self, obj):
+    def get_content_rank(self, obj):
         cr = RankCourse.objects.filter(course_id=obj.course.id)
-        value = cr.aggregate(value=Sum('tashkil_value')).get('value')
+        value = cr.aggregate(value=Sum('content_value')).get('value')
+        if value is None:
+            value = 0
+        if cr.count() > 0:
+            return round(value / cr.count(), 2)
+        else:
+            return 0
+
+    def get_video_rank(self, obj):
+        cr = RankCourse.objects.filter(course_id=obj.course.id)
+        value = cr.aggregate(value=Sum('video_value')).get('value')
         if value is None:
             value = 0
         if cr.count() > 0:
