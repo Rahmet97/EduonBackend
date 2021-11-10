@@ -751,14 +751,39 @@ def get_rayting(request):
             get_token = TokenBackend(algorithm='HS256').decode(access_token, verify=False)
             user = get_token.get('user_id')
             course_id = request.GET.get("course_id")
-            rnk = RankCourse.objects.get(user_id=user, course_id=course_id)
-            cr = RankCourse.objects.filter(course_id=course_id)
-            data = {
-                "success": True,
-                "error": "",
-                "message": "Rayting olindi!",
-                "data": rayting(cr, rnk)
-            }
+            try:
+                rnk = RankCourse.objects.get(user_id=user, course_id=course_id)
+                cr = RankCourse.objects.filter(course_id=course_id)
+                data = {
+                    "success": True,
+                    "error": "",
+                    "message": "Rayting olindi!",
+                    "data": rayting(cr, rnk)
+                }
+            except RankCourse.DoesNotExist:
+                data = {
+                    "success": True,
+                    "error": "",
+                    "message": "Rayting olindi!",
+                    "data": {
+                        "course": {
+                            "rank": 0,
+                            "count": 0
+                        },
+                        "speaker": {
+                            "rank": 0,
+                            "count": 0
+                        },
+                        "content": {
+                            "rank": 0,
+                            "count": 0
+                        },
+                        "video": {
+                            "rank": 0,
+                            "count": 0
+                        }
+                    }
+                }
         else:
             data = {
                 "success": False,
