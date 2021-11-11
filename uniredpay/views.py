@@ -1,3 +1,4 @@
+import datetime
 import json
 
 import requests
@@ -13,7 +14,7 @@ from simplejwt.backends import TokenBackend
 from uniredpay import models, serializers
 from uniredpay.models import PayForBalance, PercentageOfSpeaker, UserSms
 from uniredpay.unired_sms import sms_send
-from uniredpay.user_validate import get_user
+from uniredpay.user_validate import get_user_id
 
 unired_url = {
     '9860': settings.UNICOIN_HOST_HUMO,
@@ -268,7 +269,13 @@ def payment(card_number, amount, user, expire):
 def send_sms_to_user(request):
     url = unired_url.get(request.data.get('card_number')[:4])
 
-    user = get_user(request)
+    try:
+        user = Users.objects.get(id=get_user_id(request))
+    except:
+        return Response({
+            "status": False,
+            "error": "Validation Error"
+        })
 
     data = {
         "card_number": request.data.get('card_number'),
@@ -327,7 +334,13 @@ def send_sms_to_user(request):
 def check_sms_and_payment(request):
     sms_code = request.data.get('sms_code')
 
-    user = get_user(request)
+    try:
+        user = Users.objects.get(id=get_user_id(request))
+    except:
+        return Response({
+            "status": False,
+            "error": "Validation Error"
+        })
 
     try:
         validate = UserSms.objects.get(user=user, sms_code=sms_code)
@@ -423,9 +436,15 @@ def payment_to_course(card_number, expire, user, course_id):
 @authentication_classes([])
 @permission_classes([])
 def payment_to_course_from_balance(request):
-    user = get_user(request)
-    voucher = user.bonus
-    balance = user.cash
+    try:
+        user = Users.objects.get(id=get_user_id(request))
+        voucher = user.bonus
+        balance = user.cash
+    except:
+        return Response({
+            "status": False,
+            "error": "Validation Error"
+        })
 
     try:
         course_id = int(request.data.get('course_id'))
@@ -565,7 +584,13 @@ def get_request_result(url, access_token, data, method):
 @authentication_classes([])
 @permission_classes([])
 def get_payment_history(request):
-    user = get_user(request)
+    try:
+        user = Users.objects.get(id=get_user_id(request))
+    except:
+        return Response({
+            "status": False,
+            "error": "Validation Error"
+        })
 
     data = models.PayForBalance.objects.filter(user=user)
     serial_data = serializers.PayForBalanceSerializers(data, many=True)
@@ -577,7 +602,16 @@ def get_payment_history(request):
 @authentication_classes([])
 @permission_classes([])
 def get_course_orders(request):
-    user = get_user(request)
+    try:
+        user = Users.objects.get(id=get_user_id(request))
+    except:
+        return Response({
+            "status": False,
+            "error": "Validation Error"
+        })
+
+    Order.objects.filter(date__date__lte=datetime.date(2021, 10, 1)).update(sp_summa=F('summa') * 0.7,
+                                                                            for_eduon=F('summa') * 0.3)
 
     data = Order.objects.filter(user=user)
     serial_data = OrderSerializers(data, many=True)
