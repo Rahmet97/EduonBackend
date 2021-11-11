@@ -4,34 +4,21 @@ import requests
 from django.conf import settings
 
 from django.db.models import F
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 
 from home.models import Users, Course, Order, Speaker
+from home.serializers import OrderSerializers
 from simplejwt.backends import TokenBackend
 from uniredpay import models, serializers
 from uniredpay.models import PayForBalance, PercentageOfSpeaker, UserSms
-from uniredpay.serializers import PayForBalanceSerializers, CourseOrderSerializers
 from uniredpay.unired_sms import sms_send
+from uniredpay.user_validate import get_user
 
 unired_url = {
     '9860': settings.UNICOIN_HOST_HUMO,
     '8600': settings.UNICOIN_HOST_UZCARD
 }
-
-
-# HUMO
-# ID мерчанта: 011860000118613
-# ID терминала: 23610C9U
-# point_code: 100010104110
-#
-# UZCARD
-# ID мерчанта: 90489428
-# ID терминала: 92415924
-# port: 1010
 
 
 # Card Register
@@ -257,6 +244,7 @@ def payment(card_number, amount, user, expire):
             user.cash += int(amount)
             user.save()
             PayForBalance.objects.create(user=user, amount=int(amount),
+                                         card_mask=data1['result']['card']['number_mask'],
                                          payment_id=data1['result']['payment']['id'],
                                          uu_id=data1['result']['payment']['uuid'])
         except:
@@ -280,15 +268,7 @@ def payment(card_number, amount, user, expire):
 def send_sms_to_user(request):
     url = unired_url.get(request.data.get('card_number')[:4])
 
-    try:
-        token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
-        valid_data = TokenBackend(algorithm='HS256').decode(token, verify=False)
-        user = Users.objects.get(id=valid_data['user_id'])
-    except:
-        return Response({
-            'status': False,
-            'error_type': "validation error",
-        })
+    user = get_user(request)
 
     data = {
         "card_number": request.data.get('card_number'),
@@ -347,15 +327,7 @@ def send_sms_to_user(request):
 def check_sms_and_payment(request):
     sms_code = request.data.get('sms_code')
 
-    try:
-        token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
-        valid_data = TokenBackend(algorithm='HS256').decode(token, verify=False)
-        user = Users.objects.get(id=valid_data['user_id'])
-    except:
-        return Response({
-            'status': False,
-            'error_type': "validation error",
-        })
+    user = get_user(request)
 
     try:
         validate = UserSms.objects.get(user=user, sms_code=sms_code)
@@ -426,17 +398,17 @@ def payment_to_course(card_number, expire, user, course_id):
 
     if data1.get('status'):
         p_of_speaker = PercentageOfSpeaker.objects.get_or_create()[0]
-        p_for_speaker = p_of_speaker.from_user * price / 100
-        if summa <= p_for_speaker:
-            p_for_eduon = 0
-        else:
-            p_for_eduon = summa - p_for_speaker
+
+        p_for_speaker = p_of_speaker.from_user * summa / 100
+        p_for_eduon = summa - p_for_speaker
+
         Order.objects.create(course=course, user=user, summa=summa, bonus=min(voucher, price),
                              sp_summa=p_for_speaker, discount=discount,
                              for_eduon=p_for_eduon)
         Speaker.objects.filter(id=course.author.id).update(cash=F('cash') + p_for_speaker)
         if pay_for_balance_amount > 0:
             PayForBalance.objects.create(user=user, amount=pay_for_balance_amount,
+                                         card_mask=data1['result']['card']['number_mask'],
                                          payment_id=data1['result']['payment']['id'],
                                          uu_id=data1['result']['payment']['uuid'])
         user.save()
@@ -451,17 +423,9 @@ def payment_to_course(card_number, expire, user, course_id):
 @authentication_classes([])
 @permission_classes([])
 def payment_to_course_from_balance(request):
-    try:
-        token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
-        valid_data = TokenBackend(algorithm='HS256').decode(token, verify=False)
-        user = Users.objects.get(id=valid_data['user_id'])
-        voucher = user.bonus
-        balance = user.cash
-    except:
-        return Response({
-            'status': False,
-            'error_type': "validation error",
-        })
+    user = get_user(request)
+    voucher = user.bonus
+    balance = user.cash
 
     try:
         course_id = int(request.data.get('course_id'))
@@ -483,12 +447,12 @@ def payment_to_course_from_balance(request):
         else:
             user.bonus = voucher - price
             summa = 0
+
         p_of_speaker = PercentageOfSpeaker.objects.get_or_create()[0]
-        p_for_speaker = p_of_speaker.from_user * price / 100
-        if summa <= p_for_speaker:
-            p_for_eduon = 0
-        else:
-            p_for_eduon = summa - p_for_speaker
+
+        p_for_speaker = p_of_speaker.from_user * summa / 100
+        p_for_eduon = summa - p_for_speaker
+
         Order.objects.create(course=course, user=user, summa=summa, bonus=min(voucher, price),
                              sp_summa=p_for_speaker, discount=discount,
                              for_eduon=p_for_eduon)
@@ -601,15 +565,7 @@ def get_request_result(url, access_token, data, method):
 @authentication_classes([])
 @permission_classes([])
 def get_payment_history(request):
-    try:
-        token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
-        valid_data = TokenBackend(algorithm='HS256').decode(token, verify=False)
-        user = Users.objects.get(id=valid_data['user_id'])
-    except:
-        return Response({
-            'status': False,
-            'error_type': "validation error",
-        })
+    user = get_user(request)
 
     data = models.PayForBalance.objects.filter(user=user)
     serial_data = serializers.PayForBalanceSerializers(data, many=True)
@@ -617,8 +573,13 @@ def get_payment_history(request):
     return Response(serial_data.data)
 
 
-class GetCourseOrdersList(ListAPIView):
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAdminUser]
-    queryset = Order.objects.all()
-    serializer_class = CourseOrderSerializers
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([])
+def get_course_orders(request):
+    user = get_user(request)
+
+    data = Order.objects.filter(user=user)
+    serial_data = OrderSerializers(data, many=True)
+
+    return Response(serial_data.data)
