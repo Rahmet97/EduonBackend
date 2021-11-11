@@ -446,7 +446,8 @@ class RankCourse(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     speaker_value = models.IntegerField(default=0)
     course_value = models.IntegerField(default=0)
-    tashkil_value = models.IntegerField(default=0)
+    content_value = models.IntegerField(default=0)
+    video_value = models.IntegerField(default=0)
 
     class Meta:
         unique_together = ('course', 'user')

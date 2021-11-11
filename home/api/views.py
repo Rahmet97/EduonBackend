@@ -447,7 +447,7 @@ class HomeSpeakerAPIView(APIView):
 
 
 class GetCourseListAPIView(ListAPIView):
-    queryset = Course.objects.all()
+    queryset = Course.objects.filter(is_confirmed=True)
     serializer_class = GetCourseSerializer
     # pagination_class = CourseCustomPagination
     filter_backends = [SearchFilter]
