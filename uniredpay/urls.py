@@ -13,11 +13,10 @@ urlpatterns = [
     path('hold-create/', csrf_exempt(hold_create)),
     path('hold-dismiss/', csrf_exempt(hold_dismiss)),
     path('hold-charge/', csrf_exempt(hold_charge)),
-    # path('payment/', csrf_exempt(payment)),
-    # path('payment-to-course/', csrf_exempt(payment_to_course)),
+
     path('payment-to-course-from-balance/', csrf_exempt(payment_to_course_from_balance)),
     path('send-sms/', csrf_exempt(send_sms_to_user)),
     path('check-sms-and-payment/', csrf_exempt(check_sms_and_payment)),
     path('get-payment-history/', csrf_exempt(get_payment_history)),
-    path('get-courses-order-list/', csrf_exempt(GetCourseOrdersList.as_view())),
+    path('get-courses-order-list/', csrf_exempt(get_course_orders)),
 ]

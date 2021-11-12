@@ -311,7 +311,7 @@ class Course(models.Model):
     view = models.IntegerField(default=0)
     is_top = models.IntegerField(default=0)
     is_tavsiya = models.IntegerField(default=0)
-    language = models.ForeignKey(Language, on_delete=models.CASCADE, default=1)
+    language = models.ForeignKey(Language, on_delete=models.CASCADE, default=None, null=True)
     is_confirmed = models.BooleanField(default=False)
 
     # additional info

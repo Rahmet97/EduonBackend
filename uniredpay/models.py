@@ -11,6 +11,7 @@ class PercentageOfSpeaker(models.Model):
 class PayForBalance(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE)
     amount = models.PositiveIntegerField(default=0)
+    card_mask = models.CharField(max_length=20, default=None, null=True)
     payment_id = models.PositiveIntegerField()
     uu_id = models.CharField(max_length=50, null=True, default=None, blank=True)
     date = models.DateTimeField(auto_now_add=True)
