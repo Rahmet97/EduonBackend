@@ -764,7 +764,7 @@ def get_rayting(request):
                 if rnk is not None:
                     course_rank = (rnk.course_value + rnk.video_value + rnk.content_value + rnk.speaker_value) / 4
                     speaker_ranks.append(course_rank)
-            if speaker_courses.count() != 0:
+            if speaker_courses_count != 0:
                 speaker_rank = round(sum(speaker_ranks) / speaker_courses_count, 2)
             else:
                 speaker_rank = 0
