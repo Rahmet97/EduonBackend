@@ -1189,7 +1189,105 @@ def get_sell_course_statistics(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([])
 def get_rank_statistics(request):
-    pass
+    try:
+        query = request.GET.get('query')
+        usr = request.user
+        speaker = Speaker.objects.get(speaker=usr)
+        if query == 'Video':
+            cnt_1 = RankCourse.objects.filter(Q(video_value=1), Q(course__author_id=speaker.id)).count()
+            cnt_2 = RankCourse.objects.filter(Q(video_value=2), Q(course__author_id=speaker.id)).count()
+            cnt_3 = RankCourse.objects.filter(Q(video_value=3), Q(course__author_id=speaker.id)).count()
+            cnt_4 = RankCourse.objects.filter(Q(video_value=4), Q(course__author_id=speaker.id)).count()
+            cnt_5 = RankCourse.objects.filter(Q(video_value=5), Q(course__author_id=speaker.id)).count()
+            data = {
+                "success": True,
+                "cnt_1": cnt_1,
+                "cnt_2": cnt_2,
+                "cnt_3": cnt_3,
+                "cnt_4": cnt_4,
+                "cnt_5": cnt_5
+            }
+        elif query == 'Kurs':
+            cnt_1 = RankCourse.objects.filter(Q(course_value=1), Q(course__author=speaker.id)).count()
+            cnt_2 = RankCourse.objects.filter(Q(course_value=2), Q(course__author=speaker.id)).count()
+            cnt_3 = RankCourse.objects.filter(Q(course_value=3), Q(course__author=speaker.id)).count()
+            cnt_4 = RankCourse.objects.filter(Q(course_value=4), Q(course__author=speaker.id)).count()
+            cnt_5 = RankCourse.objects.filter(Q(course_value=5), Q(course__author=speaker.id)).count()
+            data = {
+                "success": True,
+                "cnt_1": cnt_1,
+                "cnt_2": cnt_2,
+                "cnt_3": cnt_3,
+                "cnt_4": cnt_4,
+                "cnt_5": cnt_5
+            }
+        elif query == 'Kontent':
+            cnt_1 = RankCourse.objects.filter(Q(content_value=1), Q(course__author=speaker.id)).count()
+            cnt_2 = RankCourse.objects.filter(Q(content_value=2), Q(course__author=speaker.id)).count()
+            cnt_3 = RankCourse.objects.filter(Q(content_value=3), Q(course__author=speaker.id)).count()
+            cnt_4 = RankCourse.objects.filter(Q(content_value=4), Q(course__author=speaker.id)).count()
+            cnt_5 = RankCourse.objects.filter(Q(content_value=5), Q(course__author=speaker.id)).count()
+            data = {
+                "success": True,
+                "cnt_1": cnt_1,
+                "cnt_2": cnt_2,
+                "cnt_3": cnt_3,
+                "cnt_4": cnt_4,
+                "cnt_5": cnt_5
+            }
+        elif query == 'Spiker':
+            cnt_1 = RankCourse.objects.filter(Q(speaker_value=1), Q(course__author=speaker.id)).count()
+            cnt_2 = RankCourse.objects.filter(Q(speaker_value=2), Q(course__author=speaker.id)).count()
+            cnt_3 = RankCourse.objects.filter(Q(speaker_value=3), Q(course__author=speaker.id)).count()
+            cnt_4 = RankCourse.objects.filter(Q(speaker_value=4), Q(course__author=speaker.id)).count()
+            cnt_5 = RankCourse.objects.filter(Q(speaker_value=5), Q(course__author=speaker.id)).count()
+            data = {
+                "success": True,
+                "cnt_1": cnt_1,
+                "cnt_2": cnt_2,
+                "cnt_3": cnt_3,
+                "cnt_4": cnt_4,
+                "cnt_5": cnt_5
+            }
+        elif query == 'Umumiy':
+            speaker_course_ranks = RankCourse.objects.filter(course__author=speaker.id)
+            cnt_1 = 0
+            cnt_2 = 0
+            cnt_3 = 0
+            cnt_4 = 0
+            cnt_5 = 0
+            for i in speaker_course_ranks:
+                cnt = (i.video_value + i.course_value + i.content_value + i.speaker_value) / 4
+                if 1 <= cnt <= 1.5:
+                    cnt_1 += 1
+                elif 1.5 < cnt <= 2.5:
+                    cnt_2 += 1
+                elif 2.5 < cnt <= 3.5:
+                    cnt_3 += 1
+                elif 3.5 < cnt <= 4.5:
+                    cnt_4 += 1
+                elif 4.5 < cnt <= 5:
+                    cnt_5 += 1
+            data = {
+                "success": True,
+                "cnt_1": cnt_1,
+                "cnt_2": cnt_2,
+                "cnt_3": cnt_3,
+                "cnt_4": cnt_4,
+                "cnt_5": cnt_5
+            }
+        else:
+            data = {
+                "success": True,
+                "message": "Noto'gri query yuborilgan",
+            }
+    except Exception as e:
+        data = {
+            "success": False,
+            "error": "{}".format(e),
+            "message": ""
+        }
+    return Response(data)
 
 
 @api_view(['get'])
