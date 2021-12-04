@@ -38,7 +38,8 @@ class SpeakerAdmin(admin.ModelAdmin):
     list_display = ('speaker', 'get_first_name', 'get_last_name', 'phone', 'get_email', 'get_date_joined', 'image')
     list_max_show_all = 50
     search_fields = ('speaker__username', 'speaker__first_name')
-    readonly_fields = ('cash',)
+    readonly_fields = ('cash', 'card_number', 'wallet_number')
+    exclude = ('card_date', 'wallet_expire')
 
     def get_first_name(self, obj):
         return obj.speaker.first_name
@@ -72,7 +73,8 @@ class UsersAdmin(admin.ModelAdmin):
     list_max_show_all = 50
     search_fields = ('first_name', "phone", "last_name")
     date_hierarchy = ('regdate')
-    readonly_fields = ('cash', 'bonus')
+    readonly_fields = ('cash', 'bonus', 'card_number', 'wallet_number')
+    exclude = ('wallet_expire', 'card_expire')
 
 
 @admin.register(LikeOrDislike)

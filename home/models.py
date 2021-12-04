@@ -160,6 +160,8 @@ class Speaker(models.Model):
     card_number = models.CharField(max_length=50, null=True, blank=True)
     card_name = models.CharField(max_length=50, null=True, blank=True)
     card_date = models.CharField(max_length=50, null=True, blank=True)
+    wallet_number = models.CharField(max_length=20, null=True, blank=True)
+    wallet_expire = models.CharField(max_length=5, null=True, blank=True)
     own_ref_code = models.CharField(max_length=255, null=True, blank=True)
     has_course = models.BooleanField(default=False)
 
@@ -189,6 +191,8 @@ class Users(models.Model):
     phone = models.CharField(max_length=20, null=True, blank=True, unique=True)
     card_number = models.CharField(max_length=20, null=True, blank=True, unique=False)
     card_expire = models.CharField(max_length=20, null=True, blank=True, unique=False)
+    wallet_number = models.CharField(max_length=20, null=True, blank=True)
+    wallet_expire = models.CharField(max_length=5, null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     image = models.ImageField(upload_to=slugify_upload, null=True, blank=True)
     regdate = models.DateTimeField(auto_now_add=True, blank=True)
