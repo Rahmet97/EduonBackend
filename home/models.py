@@ -5,10 +5,11 @@ from os.path import splitext
 from django.contrib.auth.hashers import make_password
 from django_resized import ResizedImageField
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, connection
 
 from transliterate.utils import _, slugify
 
+from uniredpay.uniredpay_conf import wallet_api
 from . import managers
 
 
@@ -181,6 +182,23 @@ class Speaker(models.Model):
                     break
         super(Speaker, self).save(*args, **kwargs)
 
+    @property
+    def calculate_cash(self):
+        data = {
+            'number': self.wallet_number,
+            'expire': self.wallet_expire
+        }
+        try:
+            res = wallet_api(data=data, method='wallet.register')
+        except:
+            return
+
+        if res['status']:
+            self.cash = int(res['result']['balance']) / 100
+            self.save()
+
+        return self.cash
+
 
 class Users(models.Model):
     password = models.CharField(max_length=200)
@@ -262,6 +280,23 @@ class Users(models.Model):
                     self.own_ref_code = ref
                     break
         super(Users, self).save(*args, **kwargs)
+
+    @property
+    def calculate_cash(self):
+        data = {
+            'number': self.wallet_number,
+            'expire': self.wallet_expire
+        }
+        try:
+            res = wallet_api(data=data, method='wallet.register')
+        except:
+            return
+
+        if res['status']:
+            self.cash = int(res['result']['balance']) / 100
+            self.save()
+
+        return self.cash
 
 
 class PaymentHistory(models.Model):

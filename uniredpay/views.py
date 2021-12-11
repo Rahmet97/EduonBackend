@@ -14,7 +14,8 @@ from simplejwt.backends import TokenBackend
 from uniredpay import models, serializers
 from uniredpay.models import PayForBalance, PercentageOfSpeaker, UserSms
 from uniredpay.unired_sms import sms_send
-from uniredpay.user_validate import get_user_id
+
+from uniredpay import uniredpay_conf
 
 unired_url = {
     '9860': settings.UNICOIN_HOST_HUMO,
@@ -222,65 +223,27 @@ def hold_charge(request):
     return Response(data=get_request_result(url, login(url), request.data, 'hold.charge'))
 
 
-def payment(card_number, amount, user, expire):
-    url = unired_url.get(card_number[:4])
-
-    data = {
-        "card_number": card_number,
-        "expire": expire,
-        "amount": int(amount) * 100,
-    }
-    if not url:
-        return Response({'result': 'Wrong card number!!!'})
-    elif url == settings.UNICOIN_HOST_HUMO:
-        data['merchant'] = settings.HUMO_MERCHANT_ID
-        data['terminal'] = settings.HUMO_TERMINAL_ID
-    else:
-        data['merchant'] = settings.UZCARD_MERCHANT_ID
-        data['terminal'] = settings.UZCARD_TERMINAL_ID
-
-    data1 = get_request_result(url=url, access_token=login(url), data=data, method='payment')
-    if data1.get('status'):
-        try:
-            user.cash += int(amount)
-            user.save()
-            PayForBalance.objects.create(user=user, amount=int(amount),
-                                         card_mask=data1['result']['card']['number_mask'],
-                                         payment_id=data1['result']['payment']['id'],
-                                         uu_id=data1['result']['payment']['uuid'])
-        except:
-            Response({
-                'status': False,
-                'error': "Unexpected Error!!!"
-            })
-    return Response(data1)
-
-
-# balansni to'ldirish
-# data = {
-#     'card_number': '',
-#     'expire': ''
-#     'amount': ''
-#     'is_save': ''
-# }
 @api_view(['post'])
 @authentication_classes([])
 @permission_classes([])
 def send_sms_to_user(request):
     url = unired_url.get(request.data.get('card_number')[:4])
 
-    try:
-        user = Users.objects.get(id=get_user_id(request))
-    except:
-        return Response({
-            "status": False,
-            "error": "Validation Error"
-        })
+    user = uniredpay_conf.get_user(request)
+
+    if not user:
+        return Response({'status': False, 'error': "Validation Error"})
+
+    serializer = serializers.UserSMSSerializers(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors)
 
     data = {
         "card_number": request.data.get('card_number'),
         "expire": request.data.get('expire'),
     }
+
     if not url:
         return Response({'result': 'Wrong card number!!!'})
     elif url == settings.UNICOIN_HOST_HUMO:
@@ -295,17 +258,12 @@ def send_sms_to_user(request):
     if data1.get('status'):
         try:
             UserSms.objects.filter(user=user).delete()
-            if request.data.get('amount'):
-                UserSms.objects.create(user=user, sms_code=sms_send(data1['result']['phone']),
-                                       card_number=request.data.get('card_number'),
-                                       card_expire=request.data.get('expire'),
-                                       amount=int(request.data.get('amount')))
-            else:
-                UserSms.objects.create(user=user, sms_code=sms_send(data1['result']['phone']),
-                                       card_number=request.data.get('card_number'),
-                                       card_expire=request.data.get('expire'),
-                                       amount=0)
-            if request.data.get('is_save'):
+            UserSms.objects.create(user=user, sms_code=sms_send(data1['result']['phone']),
+                                   card_number=serializer.validated_data['card_number'],
+                                   card_expire=serializer.validated_data['expire'],
+                                   amount=serializer.validated_data['amount'])
+
+            if serializer.validated_data['is_save']:
                 user.card_number = request.data.get('card_number')
                 user.card_expire = request.data.get('expire')
                 user.save(update_fields=['card_number', 'card_expire'])
@@ -323,213 +281,212 @@ def send_sms_to_user(request):
     return Response(data1)
 
 
-# balansni to'ldirish
-# data = {
-#     'sms_code': '',
-#     'course_id': ''
-# }
 @api_view(['post'])
-@authentication_classes([])
 @permission_classes([])
-def check_sms_and_payment(request):
-    sms_code = request.data.get('sms_code')
+@authentication_classes([])
+def pay_for_balance(request):
+    user = uniredpay_conf.get_user(request)
+
+    if not user:
+        return Response({'status': False, 'error': 'Validation Error.'})
+
+    seria = serializers.PayForBalanceSMSSerializer(data=request.data)
+
+    if not seria.is_valid():
+        return Response(seria.errors)
 
     try:
-        user = Users.objects.get(id=get_user_id(request))
+        check_sms = UserSms.objects.get(user=user, sms_code=seria.validated_data['sms_code'])
     except:
-        return Response({
-            "status": False,
-            "error": "Validation Error"
-        })
+        return Response({'status': False, 'error': 'SMS Code in Not Valid.'})
 
-    try:
-        validate = UserSms.objects.get(user=user, sms_code=sms_code)
-    except:
-        return Response({
-            'status': False,
-            'error': 'SMS kod xato!!!'
-        })
+    print(user.phone, user.wallet_number)
 
-    if request.data.get('course_id'):
-        return payment_to_course(card_number=validate.card_number, expire=validate.card_expire, user=user,
-                                 course_id=int(request.data.get('course_id')))
-    else:
-        return payment(card_number=validate.card_number, expire=validate.card_expire, amount=validate.amount, user=user)
-
-
-def payment_to_course(card_number, expire, user, course_id):
-    url = unired_url.get(card_number[:4])
-
-    voucher = user.bonus
-    balance = user.cash
-
-    try:
-        # course_id = int(request.data.get('course_id'))
-        course = Course.objects.get(id=course_id)
-        price = course.price
-        discount = course.discount
-        price -= discount
-    except:
-        return Response({
-            'status': False,
-            'error': 'Course not found!'
-        })
-
-    data = {
-        "card_number": card_number,
-        "expire": expire,
+    pay_data = {
+        "number": check_sms.card_number,
+        "expire": check_sms.card_expire,
+        "receiver": user.wallet_number,
+        "amount": check_sms.amount * 100
     }
 
-    pay_for_balance_amount = 0
+    res = uniredpay_conf.wallet_api(data=pay_data, method='transfer.proceed')
 
-    if price <= (voucher + balance):
-        data['amount'] = 0
-        if price > voucher:
-            user.bonus = 0
-            user.cash = (voucher + balance) - price
-            summa = price - voucher
-        else:
-            user.bonus = voucher - price
-            summa = 0
-    else:
-        data['amount'] = (price - (voucher + balance)) * 100
-        user.bonus = 0
-        user.cash = 0
-        summa = price - voucher
-        pay_for_balance_amount = (price - (voucher + balance))
-
-    if not url:
-        return Response({'result': 'Wrong card number!!!'})
-    elif url == settings.UNICOIN_HOST_HUMO:
-        data['merchant'] = settings.HUMO_MERCHANT_ID
-        data['terminal'] = settings.HUMO_TERMINAL_ID
-    else:
-        data['merchant'] = settings.UZCARD_MERCHANT_ID
-        data['terminal'] = settings.UZCARD_TERMINAL_ID
-
-    data1 = get_request_result(url=url, access_token=login(url), data=data, method='payment')
-
-    if data1.get('status'):
-        p_of_speaker = PercentageOfSpeaker.objects.get_or_create()[0]
-
-        p_for_speaker = p_of_speaker.from_user * summa / 100
-        p_for_eduon = summa - p_for_speaker
-
-        Order.objects.create(course=course, user=user, summa=summa, bonus=min(voucher, price),
-                             sp_summa=p_for_speaker, discount=discount,
-                             for_eduon=p_for_eduon)
-        Speaker.objects.filter(id=course.author.id).update(cash=F('cash') + p_for_speaker)
-        if pay_for_balance_amount > 0:
-            PayForBalance.objects.create(user=user, amount=pay_for_balance_amount,
-                                         card_mask=data1['result']['card']['number_mask'],
-                                         payment_id=data1['result']['payment']['id'],
-                                         uu_id=data1['result']['payment']['uuid'])
+    if res['status']:
+        user.cash = user.calculate_cash
         user.save()
-    return Response(data1)
+        PayForBalance.objects.create(user=user, amount=check_sms.amount, tr_id=res['result']['tr_id'])
+        UserSms.objects.filter(user=user).delete()
+        return Response({'status': True, 'message': 'Successfully'})
+    return Response(res)
 
 
-# Kursga to'lov qilish balance dan
-# data = {
-#     'course_id': ''
-# }
 @api_view(['post'])
-@authentication_classes([])
 @permission_classes([])
-def payment_to_course_from_balance(request):
-    try:
-        user = Users.objects.get(id=get_user_id(request))
-        voucher = user.bonus
-        balance = user.cash
-    except:
-        return Response({
-            "status": False,
-            "error": "Validation Error"
-        })
+@authentication_classes([])
+def pay_to_course_from_balance(request):
+    user = uniredpay_conf.get_user(request)
+
+    if not user:
+        return Response({'status': False, 'error': "validation Error."})
+
+    seria = serializers.PayForCourseWithoutSMSSerializer(data=request.data)
+
+    if not seria.is_valid():
+        return Response({'status': False, 'error': seria.errors})
 
     try:
-        course_id = int(request.data.get('course_id'))
-        course = Course.objects.get(id=course_id)
-        price = course.price
-        discount = course.discount
-        price -= discount
-    except:
-        return Response({
-            'status': False,
-            'error': 'Course not found!'
-        })
+        course = Course.objects.get(id=seria.validated_data['course_id'])
+        price = course.price - course.discount
+    except Exception as e:
+        return Response({'status': False, 'error': f'{e}'})
 
-    if price <= (voucher + balance):
-        if price > voucher:
-            user.bonus = 0
-            user.cash = (voucher + balance) - price
-            summa = price - voucher
-        else:
-            user.bonus = voucher - price
-            summa = 0
-
-        p_of_speaker = PercentageOfSpeaker.objects.get_or_create()[0]
-
-        p_for_speaker = p_of_speaker.from_user * summa / 100
-        p_for_eduon = summa - p_for_speaker
-
-        Order.objects.create(course=course, user=user, summa=summa, bonus=min(voucher, price),
-                             sp_summa=p_for_speaker, discount=discount,
-                             for_eduon=p_for_eduon)
-        Speaker.objects.filter(id=course.author.id).update(cash=F('cash') + p_for_speaker)
+    if price <= user.bonus:
+        user.bonus -= price
+        Order.objects.create(user=user, course=course, bonus=price, dicount=course.discount)
         user.save()
-        return Response({
-            'status': True,
-            'error': "To'lov muvoffaqiyatli amalga oshirildi!!!"
-        })
-    else:
-        return Response({
-            'status': False,
-            'error': 'Hisobingizda mablag\' yetarli emas!!!'
-        })
+        return Response({'status': True, 'message': 'Successfully.'})
+    elif price > (user.cash + user.bonus):
+        return Response({'status': False, 'message': 'Hisobingizda mablag\' yetarli emas.'})
+
+    price -= user.bonus
+
+    return pay_eduon_and_speaker(user=user, course=course, amount=price)
 
 
-# To'lov ni bekor qilish
-# Humo
-# data = {
-#     "payment_id": "{{payment_id}}",
-#     "uuid": "{{uuid}}"
-# }
-# UZcard
-# data = {
-#     "payment_id": "{{payment_id}}",
-# }
 @api_view(['post'])
-@authentication_classes([])
 @permission_classes([])
-def payment_cancel(request):
-    uu_id = request.data.get('uuid')
-    if uu_id:
-        url = settings.UNICOIN_HOST_HUMO
+@authentication_classes([])
+def pay_to_course_from_card(request):
+    user = uniredpay_conf.get_user(request)
+
+    if not user:
+        return Response({'status': False, 'error': "Validation Error."})
+
+    seria = serializers.PayForCourseSMSSerializer(data=request.data)
+
+    if not seria.is_valid():
+        return Response({'status': False, 'error': seria.errors})
+
+    try:
+        user_sms = UserSms.objects.get(user=user, sms_code=seria.validated_data['sms_code'])
+    except:
+        return Response({'status': False, 'error': 'SMS code is Invalid.'})
+
+    try:
+        course = Course.objects.get(id=seria.validated_data['course_id'])
+        price = course.price - course.discount
+    except Exception as e:
+        return Response({'status': False, 'error': f'{e}'})
+
+    if price <= user.bonus:
+        user.bonus -= price
+        Order.objects.create(course=course, user=user, bonus=price, discount=course.discount)
+        user.save()
+        return Response({'status': True, 'message': 'Successfully'})
+    elif price <= (user.cash + user.bonus):
+        price -= user.bonus
+
+        return pay_eduon_and_speaker(user=user, course=course, amount=price)
     else:
-        url = settings.UNICOIN_HOST_UZCARD
-    return Response(data=get_request_result(url, login(url), request.data, 'payment.cancel'))
+        price -= user.bonus
+        pay = price - user.cash
+
+        data = {
+            "number": user_sms.card_number,
+            "expire": user_sms.card_expire,
+            "receiver": user.wallet_number,
+            "amount": pay * 100
+        }
+
+        res = uniredpay_conf.wallet_api(data=data, method='transfer.proceed')
+
+        if res['status']:
+            PayForBalance.objects.create(user=user, amount=pay, tr_id=res['result']['tr_id'])
+            UserSms.objects.filter(user=user).delete()
+
+            return pay_eduon_and_speaker(user=user, course=course, amount=price)
+        return Response(res)
 
 
-# To'lov check
-# Humo
-# data = {
-#     "payment_id": "{{payment_id}}",
-#     "uuid": "{{uuid}}"
-# }
-# UZcard
-# data = {
-#     "payment_id": "{{payment_id}}",
-# }
 @api_view(['post'])
-@authentication_classes([])
 @permission_classes([])
-def payment_check(request):
-    uu_id = request.data.get('uuid')
-    if uu_id:
-        url = settings.UNICOIN_HOST_HUMO
+@authentication_classes([])
+def get_money_from_wallet(request):
+    speaker = uniredpay_conf.get_speaker(request)
+
+    if not speaker:
+        return Response({"status": False, 'error': 'Validation Error.'})
+
+    seria = serializers.SpeakerCardSerializers(data=request.data)
+
+    if not seria.is_valid():
+        return Response({'status': False, 'error': seria.errors})
+
+    data = {
+        "number": speaker.wallet_number,
+        "expire": speaker.wallet_expire,
+        "receiver": seria.validated_data['card_number'],
+        "amount": speaker.cash
+    }
+
+    res = uniredpay_conf.wallet_api(data=data, method='transfer.proceed')
+
+    if res.get('status'):
+        speaker.cash = speaker.calculate_cash
+        speaker.save()
+        return Response({'status': True, 'message': 'Successfully'})
+
+    return Response(res)
+
+
+def pay_eduon_and_speaker(user, course, amount):
+    speaker = course.author
+    p_of_pay, create = PercentageOfSpeaker.objects.get_or_create()
+
+    if user.parent_ref_code == speaker.own_ref_code:
+        for_speaker = amount * p_of_pay.from_own_staff / 100
+        for_eduon = amount - for_speaker
     else:
-        url = settings.UNICOIN_HOST_UZCARD
-    return Response(data=get_request_result(url, login(url), request.data, 'payment.check'))
+        for_speaker = amount * p_of_pay.from_user / 100
+        for_eduon = amount - for_speaker
+
+    pay_sp_data = {
+        "number": user.wallet_number,
+        "expire": user.wallet_expire,
+        "receiver": speaker.wallet_number,
+        "amount": for_speaker * 100
+    }
+
+    pay_eduon_data = {
+        "number": user.wallet_number,
+        "expire": user.wallet_expire,
+        "amount": for_eduon * 100
+    }
+
+    res_sp = uniredpay_conf.wallet_api(data=pay_sp_data, method='transfer.proceed')
+    if res_sp['status']:
+        res_eduon = uniredpay_conf.wallet_api(data=pay_eduon_data, method='payment.proceed')
+        if res_eduon['status']:
+            user.cash = user.calculate_cash
+            speaker.cash = speaker.calculate_cash
+            Order.objects.create(course=course, user=user, bonus=user.bonus, summa=amount, sp_summa=for_speaker,
+                                 discount=course.discount,
+                                 for_eduon=for_eduon)
+            user.bonus = 0
+            user.save()
+            speaker.save()
+            return Response({'status': True, 'message': "Successfully"})
+        else:
+            pay_sp_data = {
+                "number": speaker.wallet_number,
+                "expire": speaker.wallet_expire,
+                "receiver": user.wallet_number,
+                "amount": for_speaker
+            }
+
+            uniredpay_conf.wallet_api(data=pay_sp_data, method='transfer.proceed')
+
+    return Response(res_sp)
 
 
 def login(url):
@@ -585,7 +542,7 @@ def get_request_result(url, access_token, data, method):
 @permission_classes([])
 def get_payment_history(request):
     try:
-        user = Users.objects.get(id=get_user_id(request))
+        user = uniredpay_conf.get_user(request)
     except:
         return Response({
             "status": False,
@@ -603,15 +560,12 @@ def get_payment_history(request):
 @permission_classes([])
 def get_course_orders(request):
     try:
-        user = Users.objects.get(id=get_user_id(request))
+        user = uniredpay_conf.get_user(request)
     except:
         return Response({
             "status": False,
             "error": "Validation Error"
         })
-
-    Order.objects.filter(date__date__lte=datetime.date(2021, 10, 1)).update(sp_summa=F('summa') * 0.7,
-                                                                            for_eduon=F('summa') * 0.3)
 
     data = Order.objects.filter(user=user)
     serial_data = OrderSerializers(data, many=True)

@@ -12,8 +12,7 @@ class PayForBalance(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE)
     amount = models.PositiveIntegerField(default=0)
     card_mask = models.CharField(max_length=20, default=None, null=True)
-    payment_id = models.PositiveIntegerField()
-    uu_id = models.CharField(max_length=50, null=True, default=None, blank=True)
+    tr_id = models.CharField(max_length=100, null=True, default=None, blank=True)
     date = models.DateTimeField(auto_now_add=True)
 
 
@@ -23,3 +22,10 @@ class UserSms(models.Model):
     card_number = models.CharField(max_length=20)
     card_expire = models.CharField(max_length=10)
     amount = models.PositiveIntegerField()
+
+
+class PaymentHoldLimitTime(models.Model):
+    day = models.PositiveSmallIntegerField(verbose_name='Kun', default=3)
+
+    class Meta:
+        verbose_name_plural = 'Foydalanuvchilarga to\'lovni qaytarish muddati'

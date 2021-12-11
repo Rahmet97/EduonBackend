@@ -1075,8 +1075,8 @@ def full_register(request):
 @permission_classes([])
 def LogIn(request):
     try:
-        phone = request.POST.get('phone')
-        password = request.POST.get('password')
+        phone = request.data.get('phone')
+        password = request.data.get('password')
         phone = str(phone).replace('+', '')
         try:
             speaker = Speaker.objects.filter(phone=phone).first()
