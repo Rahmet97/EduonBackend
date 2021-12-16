@@ -227,8 +227,6 @@ def hold_charge(request):
 @authentication_classes([])
 @permission_classes([])
 def send_sms_to_user(request):
-    url = unired_url.get(request.data.get('card_number')[:4])
-
     user = uniredpay_conf.get_user(request)
 
     if not user:
@@ -238,6 +236,8 @@ def send_sms_to_user(request):
 
     if not serializer.is_valid():
         return Response(serializer.errors)
+
+    url = unired_url.get(serializer.validated_data['card_number'][:4])
 
     data = {
         "card_number": request.data.get('card_number'),
@@ -300,7 +300,8 @@ def pay_for_balance(request):
     except:
         return Response({'status': False, 'error': 'SMS Code in Not Valid.'})
 
-    print(user.phone, user.wallet_number)
+    if not user.wallet_number:
+        return Response({'status': False, 'error': "Wallet Not Found"})
 
     pay_data = {
         "number": check_sms.card_number,
@@ -309,13 +310,19 @@ def pay_for_balance(request):
         "amount": check_sms.amount * 100
     }
 
-    res = uniredpay_conf.wallet_api(data=pay_data, method='transfer.proceed')
+    try:
+        res = uniredpay_conf.wallet_api(data=pay_data, method='transfer.proceed')
+    except:
+        return Response({'status': False, 'error': "Kutilmagan xatolik. Iltimos boshqatdan urunib ko'ring!!!"})
 
     if res['status']:
-        user.cash = user.calculate_cash
-        user.save()
-        PayForBalance.objects.create(user=user, amount=check_sms.amount, tr_id=res['result']['tr_id'])
-        UserSms.objects.filter(user=user).delete()
+        try:
+            user.cash = user.calculate_cash
+            user.save()
+            PayForBalance.objects.create(user=user, amount=check_sms.amount, tr_id=res['result']['tr_id'])
+            UserSms.objects.filter(user=user).delete()
+        except Exception as e:
+            return Response({'error': f'{e}'})
         return Response({'status': True, 'message': 'Successfully'})
     return Response(res)
 
@@ -341,9 +348,12 @@ def pay_to_course_from_balance(request):
         return Response({'status': False, 'error': f'{e}'})
 
     if price <= user.bonus:
-        user.bonus -= price
-        Order.objects.create(user=user, course=course, bonus=price, dicount=course.discount)
-        user.save()
+        try:
+            user.bonus -= price
+            Order.objects.create(user=user, course=course, bonus=price, discount=course.discount)
+            user.save()
+        except Exception as e:
+            return Response({'status': False, 'error': f'{e}'})
         return Response({'status': True, 'message': 'Successfully.'})
     elif price > (user.cash + user.bonus):
         return Response({'status': False, 'message': 'Hisobingizda mablag\' yetarli emas.'})
@@ -378,6 +388,9 @@ def pay_to_course_from_card(request):
     except Exception as e:
         return Response({'status': False, 'error': f'{e}'})
 
+    if not user.wallet_number:
+        return Response({'status': False, 'error': "User don't have wallet!!!"})
+
     if price <= user.bonus:
         user.bonus -= price
         Order.objects.create(course=course, user=user, bonus=price, discount=course.discount)
@@ -386,7 +399,7 @@ def pay_to_course_from_card(request):
     elif price <= (user.cash + user.bonus):
         price -= user.bonus
 
-        return pay_eduon_and_speaker(user=user, course=course, amount=price)
+        return pay_eduon_and_speaker(user=user, course=course, amount=price, card_number=user_sms.card_number)
     else:
         price -= user.bonus
         pay = price - user.cash
@@ -398,13 +411,16 @@ def pay_to_course_from_card(request):
             "amount": pay * 100
         }
 
-        res = uniredpay_conf.wallet_api(data=data, method='transfer.proceed')
+        try:
+            res = uniredpay_conf.wallet_api(data=data, method='transfer.proceed')
+        except:
+            return Response({'status': False, 'error': "Kutilmagan xatolik. Iltimos keyinroq urinib ko'ring!!!"})
 
         if res['status']:
             PayForBalance.objects.create(user=user, amount=pay, tr_id=res['result']['tr_id'])
             UserSms.objects.filter(user=user).delete()
 
-            return pay_eduon_and_speaker(user=user, course=course, amount=price)
+            return pay_eduon_and_speaker(user=user, course=course, amount=price, card_number=user_sms.card_number)
         return Response(res)
 
 
@@ -422,6 +438,9 @@ def get_money_from_wallet(request):
     if not seria.is_valid():
         return Response({'status': False, 'error': seria.errors})
 
+    if speaker.cash < 50000:
+        return Response({'status': False, 'error': "Hisobingizda 50 ming dan kam mablag' bor!!!"})
+
     data = {
         "number": speaker.wallet_number,
         "expire": speaker.wallet_expire,
@@ -429,7 +448,10 @@ def get_money_from_wallet(request):
         "amount": speaker.cash
     }
 
-    res = uniredpay_conf.wallet_api(data=data, method='transfer.proceed')
+    try:
+        res = uniredpay_conf.wallet_api(data=data, method='transfer.proceed')
+    except:
+        return Response({'status': False, 'error': "Kutilmagan xatolik. Iltimos keyinroq urinib ko'ring!!!"})
 
     if res.get('status'):
         speaker.cash = speaker.calculate_cash
@@ -439,9 +461,12 @@ def get_money_from_wallet(request):
     return Response(res)
 
 
-def pay_eduon_and_speaker(user, course, amount):
+def pay_eduon_and_speaker(user, course, amount, card_number=None):
     speaker = course.author
     p_of_pay, create = PercentageOfSpeaker.objects.get_or_create()
+
+    if not speaker.wallet_number:
+        return Response({'status': False, 'error': "Speaker don't have wallet!!!"})
 
     if user.parent_ref_code == speaker.own_ref_code:
         for_speaker = amount * p_of_pay.from_own_staff / 100
@@ -460,31 +485,31 @@ def pay_eduon_and_speaker(user, course, amount):
     pay_eduon_data = {
         "number": user.wallet_number,
         "expire": user.wallet_expire,
-        "amount": for_eduon * 100
+        "amount": for_eduon * 100,
+        "time": 100
     }
 
-    res_sp = uniredpay_conf.wallet_api(data=pay_sp_data, method='transfer.proceed')
-    if res_sp['status']:
-        res_eduon = uniredpay_conf.wallet_api(data=pay_eduon_data, method='payment.proceed')
-        if res_eduon['status']:
+    try:
+        res_sp = uniredpay_conf.wallet_api(data=pay_eduon_data, method='hold.create')
+    except:
+        return Response({'status': False, 'error': "Kutilmagan xatolik. Iltimos boshqatdan urunib ko'ring!!!"})
+
+    if res_sp.get('status'):
+        res_eduon = uniredpay_conf.wallet_api(data=pay_sp_data, method='transfer.proceed')
+
+        if res_eduon.get('status'):
+            uniredpay_conf.wallet_api(data={'tr_id': res_sp['result']['tr_id']}, method='hold.charge')
             user.cash = user.calculate_cash
             speaker.cash = speaker.calculate_cash
             Order.objects.create(course=course, user=user, bonus=user.bonus, summa=amount, sp_summa=for_speaker,
                                  discount=course.discount,
-                                 for_eduon=for_eduon)
+                                 for_eduon=for_eduon, card_number=card_number)
             user.bonus = 0
             user.save()
             speaker.save()
             return Response({'status': True, 'message': "Successfully"})
         else:
-            pay_sp_data = {
-                "number": speaker.wallet_number,
-                "expire": speaker.wallet_expire,
-                "receiver": user.wallet_number,
-                "amount": for_speaker
-            }
-
-            uniredpay_conf.wallet_api(data=pay_sp_data, method='transfer.proceed')
+            uniredpay_conf.wallet_api(data={'tr_id': res_sp['result']['tr_id']}, method='hold.dismiss')
 
     return Response(res_sp)
 
@@ -530,12 +555,6 @@ def get_request_result(url, access_token, data, method):
     rq = requests.post(url, headers=headers, data=json.dumps(data))
     return rq.json()
 
-
-# class GetPaymentListClass(ListAPIView):
-#     authentication_classes = [BasicAuthentication]
-#     permission_classes = [IsAuthenticated]
-#     queryset = models.PayForBalance.objects.all()
-#     serializer_class = PayForBalanceSerializers
 
 @api_view(['GET'])
 @authentication_classes([])

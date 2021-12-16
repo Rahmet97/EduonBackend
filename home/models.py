@@ -500,6 +500,7 @@ class Order(models.Model):
     sp_summa = models.IntegerField(default=0)
     discount = models.IntegerField(default=0)
     for_eduon = models.IntegerField(default=0)
+    card_number = models.CharField(max_length=20, default=None, null=True)
     date = models.DateTimeField(auto_now_add=True)
 
 

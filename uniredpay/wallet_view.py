@@ -40,6 +40,15 @@ class CreateOnlineCardForUser(APIView):
         user = get_user(request)
         return create_user_wallet(user.first_name, user.last_name, user.phone)
 
+    def post(self, request):
+        try:
+            user = get_user(request)
+            cash = user.calculate_cash
+        except Exception as e:
+            return Response({'status': False, 'error': e})
+
+        return Response({'status': True, 'message': 'Successfully Updated'})
+
 
 class CreateOnlineCardForSpeaker(APIView):
     authentication_classes = []
@@ -53,3 +62,12 @@ class CreateOnlineCardForSpeaker(APIView):
             return Response({'status': False, 'error': e})
 
         return Response({'status': True, 'message': 'Successfully Created'})
+
+    def post(self, request):
+        try:
+            speaker = get_speaker(request)
+            cash = speaker.calculate_cash
+        except Exception as e:
+            return Response({'status': False, 'error': e})
+
+        return Response({'status': True, 'message': 'Successfully Update'})
