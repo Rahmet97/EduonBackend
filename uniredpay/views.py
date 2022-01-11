@@ -264,13 +264,13 @@ def send_sms_to_user(request):
                                    amount=serializer.validated_data['amount'])
 
             if serializer.validated_data['is_save']:
-                user.card_number = request.data.get('card_number')
-                user.card_expire = request.data.get('expire')
+                user.card_number = serializer.validated_data['card_number']
+                user.card_expire = serializer.validated_data['expire']
                 user.save(update_fields=['card_number', 'card_expire'])
-        except:
+        except Exception as e:
             return Response({
                 'status': False,
-                'error': 'Foydalanuvchida xatolik!!!'
+                'error': f'{e}'
             })
 
         return Response({

@@ -35,7 +35,9 @@ class OrderPaymentAdmin(admin.ModelAdmin):
 
 @admin.register(Speaker)
 class SpeakerAdmin(admin.ModelAdmin):
-    list_display = ('speaker', 'get_first_name', 'get_last_name', 'phone', 'get_email', 'get_date_joined', 'image')
+    list_display = (
+    'speaker', 'get_first_name', 'get_last_name', 'phone', 'cash', 'get_email', 'get_date_joined', 'image')
+    list_filter = ('cash',)
     list_max_show_all = 50
     search_fields = ('speaker__username', 'speaker__first_name')
     readonly_fields = ('cash', 'card_number', 'wallet_number')

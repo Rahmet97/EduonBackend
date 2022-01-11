@@ -2,9 +2,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from home.models import Users, Speaker
-from simplejwt.backends import TokenBackend
 from . import models, serializers
-from .uniredpay_conf import create_speaker_wallet, create_user_wallet, get_user, get_speaker
+from .uniredpay_conf import create_speaker_wallet, create_user_wallet, get_user, get_speaker, wallet_api
 
 '''
 Online Card Create
@@ -33,6 +32,14 @@ class CreateWalletUserAndSpeakersCLass(APIView):
 
         return Response({'status': True, 'message': 'Muvoffaqiyatli amalga oshirildi!!!'})
 
+    def post(self, request):
+        try:
+            res = wallet_api(data={}, method='wallet.balance')
+        except Exception as e:
+            return Response({'status': False, 'error': f'{e}'})
+
+        return Response(res)
+
 
 class CreateOnlineCardForUser(APIView):
 
@@ -48,6 +55,30 @@ class CreateOnlineCardForUser(APIView):
             return Response({'status': False, 'error': e})
 
         return Response({'status': True, 'message': 'Successfully Updated'})
+
+    def put(self, request):
+        try:
+            user = get_user(request)
+            serial = serializers.CardHistorySerializers(data=request.data)
+
+            if not serial.is_valid():
+                return Response(serial.errors)
+
+            if not user.wallet_number:
+                return Response({'status': False, 'error': "Online wallet not found"})
+
+            data = {
+                'number': user.wallet_number,
+                'expire': user.wallet_expire,
+                'start_date': serial.validated_data['start_date'].strftime('%Y%m%d'),
+                'end_date': serial.validated_data['end_date'].strftime('%Y%m%d')
+            }
+
+            res = wallet_api(data=data, method='wallet.history')
+
+            return Response(res)
+        except Exception as e:
+            return Response({'status': False, 'error': f'{e}'})
 
 
 class CreateOnlineCardForSpeaker(APIView):
@@ -71,3 +102,27 @@ class CreateOnlineCardForSpeaker(APIView):
             return Response({'status': False, 'error': e})
 
         return Response({'status': True, 'message': 'Successfully Update'})
+
+    def put(self, request):
+        try:
+            speaker = get_speaker(request)
+            serial = serializers.CardHistorySerializers(data=request.data)
+
+            if not serial.is_valid():
+                return Response(serial.errors)
+
+            if not speaker.wallet_number:
+                return Response({'status': False, 'error': "Online wallet not found"})
+
+            data = {
+                'number': speaker.wallet_number,
+                'expire': speaker.wallet_expire,
+                'start_date': serial.validated_data['start_date'].strftime('%Y%m%d'),
+                'end_date': serial.validated_data['end_date'].strftime('%Y%m%d')
+            }
+
+            res = wallet_api(data=data, method='wallet.history')
+
+            return Response(res)
+        except Exception as e:
+            return Response({'status': False, 'error': f'{e}'})
