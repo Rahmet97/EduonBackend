@@ -354,21 +354,23 @@ class UsersViewset(viewsets.ModelViewSet):
             spk = Users.objects.get(phone=phone)
             if not check_password(password, spk.password):
                 data = {
-                    'status': 403,
+                    'status': status.HTTP_403_FORBIDDEN,
                     'message': 'Telefon raqam yoki password xato!',
                 }
             else:
                 users = UsersSerializer(spk)
                 data = {
-                    'status': 200,
+                    'status': status.HTTP_200_OK,
                     'user': users.data,
                 }
         except Users.DoesNotExist:
             data = {
-                'status': 404,
+                'status': status.HTTP_404_NOT_FOUND,
                 'message': 'Bunday foydalanuvchi mavjud emas!',
             }
-        return Response(data)
+        print(Response.status_code)
+        return Response(data['status'])
+
 
 
 class CategoryViewset(viewsets.ModelViewSet):
