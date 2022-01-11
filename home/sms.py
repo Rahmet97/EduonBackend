@@ -25,7 +25,6 @@ def sms_send(phone_number, text):
             result = requests.post(settings.SMS_BASE_URL + '/api/message/sms/send',
                                    {'mobile_phone': phone_number, 'message': text},
                                    headers={'Authorization': f'Bearer {settings.SMS_TOKEN}'}).json()
-
             return result
         else:
             payload = {

@@ -8,6 +8,7 @@ from django.db.models import Q, Sum
 from django.http import JsonResponse
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from home.models import (
@@ -362,16 +363,18 @@ def login(request):
                 }
             else:
                 data = {
-                    "success": False,
+                    "status_code": status.HTTP_401_UNAUTHORIZED,
                     "error": "Telefon raqam yoki password xato!!",
                     "message": ""
                 }
+                return Response(status.HTTP_401_UNAUTHORIZED)
         except Users.DoesNotExist:
             data = {
-                "success": False,
+                "status_code": status.HTTP_401_UNAUTHORIZED,
                 "error": "Bunday foydalanuvchi mavjud emas!",
                 "message": ""
             }
+            return Response(status.HTTP_401_UNAUTHORIZED)
 
     except Exception as er:
         data = {

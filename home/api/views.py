@@ -144,13 +144,11 @@ class UploadVideoAndDocumentAPIView(CreateAPIView):
     """
     serializer_class = VideoCourseModelSerializer
     queryset = VideoCourse.objects.all()
-    permission_classes = []
-    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
 
     def perform_create(self, serializer):
-        print(self.request)
         speaker = Speaker.objects.get(speaker_id=self.request.user.id)
-        # speaker = Speaker.objects.get(id=1016)  # check qilish uchun
         serializer.save(author=speaker)
 
 
@@ -185,7 +183,7 @@ class VideosAPIView(APIView):
                 likes = LikeOrDislike.objects.filter(value=1, video_id=video['id']).count()
                 dislikes = LikeOrDislike.objects.filter(value=-1, video_id=video['id']).count()
                 views = VideoViews.objects.filter(video_id=video['id']).count()
-
+                
                 dt = {
                     'likes': likes,
                     'dislikes': dislikes,
