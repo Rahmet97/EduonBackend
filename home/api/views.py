@@ -1,17 +1,12 @@
 from datetime import datetime
-import logging
-
 from django.http import JsonResponse
 from moviepy.editor import VideoFileClip
 from django.db.models import Sum, Avg, Q
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.filters import SearchFilter
-from rest_framework.generics import CreateAPIView, get_object_or_404, ListAPIView, RetrieveUpdateAPIView
-from rest_framework.permissions import IsAuthenticated
-from django.db.models import ProtectedError
+from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.response import Response
-from rest_framework.views import exception_handler
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.backends import TokenBackend
